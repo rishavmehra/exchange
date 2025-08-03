@@ -1,0 +1,9 @@
+[package]
+name = "api"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+actix-web = "4.11.0"
+diesel ={ version="2.2.12", features= ["postgres"] }
+dotenv = "0.15.0"
