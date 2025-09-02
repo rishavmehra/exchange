@@ -1,3 +1,7 @@
 [workspace]
 resolver = "1"
-members = ["api"]
+members = ["api", "clobv2/*"]
+
+
+[workspace.dependencies]
+rust_decimal = "1.37.2"
