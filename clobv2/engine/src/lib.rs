@@ -147,4 +147,76 @@ fn execute_trade(taker_order: &mut Order, maker_price_level:  &mut PriceLevel, e
 
 
 
-// test is needed
+mod tests {
+
+    use std::collections::BTreeMap;
+
+    use common_types::{OrderType, Price};
+    use rust_decimal_macros::dec;
+
+    use super::*;
+
+    fn create_order(
+        order_id: u64,
+        trader_id: u64,
+        market_id: u64,
+        trade_side: TradeSide,
+        price: Price,
+        trade_quantity: Decimal,
+        order_type: OrderType,
+        timestamp: u64
+    ) -> Order {
+        Order {
+            order_id,
+            trader_id,
+            market_id,
+            trade_side,
+            price,
+            trade_quantity,
+            order_type,
+            timestamp
+        }
+    }
+
+    #[test]
+    fn order_with_no_match(){
+        let mut book = OrderBook {
+            bids: BTreeMap::new(),
+            ask: BTreeMap::new(),
+            next_trade_id: 0
+        };
+        
+        let order = create_order(1, 1, 1, TradeSide::Buy, dec!(100.0), dec!(10), OrderType::Limit, 0);
+        let events = book.process_order(order);
+
+        assert_eq!(book.bids.len(), 1);
+        assert_eq!(book.ask.len(), 0);
+        assert_eq!(book.bids.get(&std::cmp::Reverse(dec!(100.0))).unwrap().len(), 1 );
+        assert_eq!(events.len(), 1);
+        assert!(matches!(events[0], TradeEvent::OrderPlaced { .. }))
+    }
+
+    #[test]
+    fn full_order() {
+        let mut book = OrderBook{
+            bids: BTreeMap::new(),
+            ask: BTreeMap::new(),
+            next_trade_id: 0
+        };
+        let maker_order = create_order(1, 1, 1, TradeSide::Sell, dec!(100.0), dec!(10.0), OrderType::Limit, 0);
+        book.process_order(maker_order);
+        let taker_order = create_order(2, 2, 1, TradeSide::Buy, dec!(100.0), dec!(10.0), OrderType::Limit, 0);
+        let event = book.process_order(taker_order);
+
+        assert!(book.bids.is_empty());
+        assert!(book.ask.is_empty());
+        assert_eq!(event.len(), 1);
+        match &event[0] {
+            TradeEvent::OrderTraded(trade) =>{
+                assert_eq!(trade.maker_order_id, maker_order.trader_id);
+                assert_eq!(trade.taker_user_id, taker_order.trader_id)
+            }
+            _ => panic!("need some trade events")
+        }
+    }
+}
