@@ -6,4 +6,5 @@ edition = "2024"
 [dependencies]
 rust_decimal = { workspace = true }
 common-types = {path = "../common-types"}
+rust_decimal_macros = "1.37.1"
 

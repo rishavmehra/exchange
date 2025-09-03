@@ -13,12 +13,19 @@ impl ExecutionEngine for OrderBook {
             match_buy_order(self, &mut order, &mut events);
         }
         else {
-
-            // todo:  match_sell_order
+            match_sell_order(self, &mut order, &mut events);
         }
+
+        if order.trade_quantity > Decimal::ZERO{
+            place_order(self, order, &mut events);
+        }
+
         events
     }
 }
+
+// Bid -> Buy
+// Ask -> Sell
 
 pub fn match_buy_order(
     book: &mut OrderBook,
@@ -45,6 +52,51 @@ pub fn match_buy_order(
     }
 }
 
+
+// Bid -> Buy
+// Ask -> Sell
+
+pub fn match_sell_order(
+    book: &mut OrderBook,
+    order: &mut Order,
+    events: &mut Vec<TradeEvent>
+) {
+    while order.trade_quantity > Decimal::ZERO{
+        let best_bid_price = match book.bids.first_key_value() {
+            Some((price, _)) => *price,
+            None => break
+        };
+
+        if best_bid_price < std::cmp::Reverse(order.price) {
+            break;
+        }
+
+        let best_level = book.ask.first_entry().unwrap().into_mut();
+        execute_trade(order, best_level, events, &mut book.next_trade_id);
+
+        if best_level.is_empty() {
+            book.bids.remove(&best_bid_price);
+        }
+    }
+}
+
+
+pub fn place_order(
+    book: &mut OrderBook,
+    order: Order,
+    events: &mut Vec<TradeEvent>
+) {
+    let price_level = match order.trade_side {
+        TradeSide::Buy => book.bids.entry(std::cmp::Reverse(order.price)).or_default(),
+        TradeSide::Sell => book.ask.entry(order.price).or_default(),
+    };
+
+    price_level.push_back(order);
+
+    events.push(TradeEvent::OrderPlaced { order_id: order.order_id, trader_id: order.trader_id, market_id: order.market_id, side: order.trade_side, price: order.price, quantity: order.trade_quantity, order_type: order.order_type, timestamp: order.timestamp });
+
+}
+
 fn execute_trade(taker_order: &mut Order, maker_price_level:  &mut PriceLevel, events: &mut Vec<TradeEvent>, next_trade_id: &mut u64) {
     let mut filled_maker_orders = Vec::new();
     for (i, maker_order) in maker_price_level.iter_mut().enumerate() {
@@ -64,7 +116,8 @@ fn execute_trade(taker_order: &mut Order, maker_price_level:  &mut PriceLevel, e
         taker_order.trade_quantity -= trade_qty;
         maker_order.trade_quantity -= trade_qty;
 
-        let trade = Trade {
+        *next_trade_id += 1;
+        events.push(TradeEvent::OrderTraded(Trade {
             trade_id: TradeID(*next_trade_id),
             market_id: taker_order.market_id,
             maker_order_id: maker_order.order_id,
@@ -74,9 +127,7 @@ fn execute_trade(taker_order: &mut Order, maker_price_level:  &mut PriceLevel, e
             quantity: trade_qty,
             price: maker_order.price,
             timestamp: taker_order.timestamp
-        };
-        *next_trade_id += 1;
-        events.push(TradeEvent::OrderTraded(trade));
+        }));
 
         // if maker order is completely filled - mark it for removal
         if maker_order.trade_quantity == Decimal::ZERO {
@@ -94,11 +145,6 @@ fn execute_trade(taker_order: &mut Order, maker_price_level:  &mut PriceLevel, e
 
 }
 
-pub fn match_sell_order(
-
-) {
-    
-}
 
 
 // test is needed

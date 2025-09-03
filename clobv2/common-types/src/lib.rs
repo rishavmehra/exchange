@@ -2,12 +2,13 @@ use std::collections::{BTreeMap, VecDeque};
 
 use rust_decimal::Decimal;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Copy, Clone)]
 pub enum TradeSide {
     Buy,
     Sell
 }
 
+#[derive(Copy, Clone)]
 pub enum OrderType {
     Limit,
 }
@@ -21,6 +22,7 @@ pub struct OrderBook {
     pub next_trade_id: u64
 }
 
+#[derive(Copy, Clone)]
 pub struct Order {
     pub order_id: u64,
     pub trader_id: u64, 
@@ -52,8 +54,8 @@ pub enum TradeEvent {
         trader_id: u64,
         market_id: u64,
         side: TradeSide,
-        price: f64,
-        quantity: f64,
+        price: Decimal,
+        quantity: Decimal,
         order_type: OrderType,
         timestamp: u64
     },
